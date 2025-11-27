@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<!-- 版本號 2025/11/24  v1.0.1 -->
+<html lang="zh-Hant">直ˊ直ˊ
+
+    <!-- Dialogflow Messenger 官方樣式 -->
+    <link rel="stylesheet" href="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/themes/df-messenger-default.css">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f6f6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .controls {
+            display: none;
+        }
+        #file-browser {
+            border: 1px solid #eee;
+            padding: 15px;
+            min-height: 200px;
+            
+
+            border-radius: 4px;
+        }
+        #file-browser div {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        #file-browser div:hover {
+            background-color: #e9f5ff;
+        }
+        #file-browser div:last-child {
+            border-bottom: none;
+        }
+        #loading {
+            display: block;
+            color: #777;
+        }
+
+        /* Dialogflow Messenger 的視覺樣式 */
+        df-messenger {
+            z-index: 999;
+            position: fixed;
+            --df-messenger-font-color: #000;
+            --df-messenger-font-family: Google Sans;
+            --df-messenger-chat-background: #f3f6fc;
+            --df-messenger-message-user-background: #d3e3fd;
+            --df-messenger-message-bot-background: #fff;
+            bottom: 16px;
+            right: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>我的雲端檔案 (管理員模式)</h1>
+        <h2>所有用戶檔案列表</h2>
+        <div id="file-browser">
+            <div id="loading">載入中...</div>
+            <div id="file-list"></div>
+        </div>
+    </div>
+
+    <!-- Dialogflow Messenger 元件 -->
+    <script src="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/df-messenger.js"></script>
+
+    <!-- ✅ 這裡是「合併後」的 df-messenger，只有一個 -->
+    <df-messenger>
+      location="us-central1"
+      project-id="chatbot-with-ibm"
+      agent-id="5fc06c04-a4cb-4c27-bb00-4935882b0c0b"
+      language-code="en"
+
+      <!-- 從第二筆範例加進來的設定 -->
+      intent="WELCOME"
+      max-query-length="-1"
+
+      <!-- 這裡填你真正的 GCS bucket 名稱 -->
+      gcs-upload="ibmchatbotbucket"
+      
+      <df-messenger-chat-bubble>
+        chat-title="course advirser"
+        enable-file-upload
+        enable-audio-input>
+      </df-messenger-chat-bubble>
+    </df-messenger>
+
+    <script>
+        // ✅ 管理員 API URL：列出 GCS 內所有檔案 (你已經有)
+        const ADMIN_API_URL = "https://list-gcs-folders-448262279430.northamerica-northeast2.run.app/list_all_files_admin_http";
+
+        const fileListDiv = document.getElementById('file-list');
+        const loadingDiv = document.getElementById('loading');
+
+        // 載入所有檔案清單
+        async function loadAllFiles() {
+            fileListDiv.innerHTML = '';
+            loadingDiv.style.display = 'block';
+            try {
+                const response = await fetch(ADMIN_API_URL);
+                if (!response.ok) {
+                    let errorText = `HTTP 錯誤: ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) errorText = errorData.error;
+                    } catch (e) {
+                        // 若不是 JSON 就忽略
+                    }
+                    throw new Error(errorText);
+                }
+
+                const data = await response.json();
+                loadingDiv.style.display = 'none';
+
+                if (data.files && data.files.length > 0) {
+                    data.files.forEach(file => {
+                        const item = document.createElement('div');
+                        // 之後如果有提供下載 URL，可改成 <a href="..."> 形式
+                        item.innerHTML = `📄 ${file}`;
+                        item.onclick = () => {
+                            alert(`點擊了檔案: ${file}`);
+                            // TODO: 在這裡可以呼叫另一個後端 API 取得 signed URL 進行下載
+                        };
+                        fileListDiv.appendChild(item);
+                    });
+                } else {
+                    fileListDiv.innerHTML = '<div>' +
+                        (data.files ? 'GCS "users/" 資料夾中沒有任何檔案。' : '未收到預期的檔案資料。') +
+                        '</div>';
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                fileListDiv.innerHTML = `<div style="color: red;">載入失敗: ${error.message}</div>`;
+                console.error('Fetch error:', error);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadAllFiles();
+        });
+    </script>
+</body>
+</html>
